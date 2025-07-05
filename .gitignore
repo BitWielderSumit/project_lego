@@ -3,6 +3,9 @@
 .ssh/
 */.ssh/
 
+# Git switchboard (local account management)
+git-switchboard/
+
 # OS generated files
 .DS_Store
 .DS_Store?
