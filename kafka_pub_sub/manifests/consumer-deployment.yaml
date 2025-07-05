@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atm-consumer
+  namespace: kafka
+  labels:
+    app: atm-consumer
+    component: consumer
+    system: kafka-pub-sub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atm-consumer
+  template:
+    metadata:
+      labels:
+        app: atm-consumer
+        component: consumer
+        system: kafka-pub-sub
+    spec:
+      containers:
+      - name: atm-consumer
+        image: atm-consumer:latest
+        imagePullPolicy: Never
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka-local.kafka.svc.cluster.local:9092"
+        - name: KAFKA_TOPIC
+          value: "atm-transactions"
+        - name: KAFKA_GROUP_ID
+          value: "atm-consumer-group"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import kafka; print('OK')"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import kafka; print('OK')"
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: config-volume
+        configMap:
+          name: atm-consumer-config
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atm-consumer-config
+  namespace: kafka
+  labels:
+    app: atm-consumer
+    component: consumer
+    system: kafka-pub-sub
+data:
+  consumer-config.yaml: |
+    kafka:
+      bootstrap_servers: "kafka-local.kafka.svc.cluster.local:9092"
+      topic: "atm-transactions"
+      group_id: "atm-consumer-group"
+      auto_offset_reset: "latest"  # "earliest" or "latest"
+
+    consumer:
+      # Display configuration
+      display_format: "detailed"  # "detailed", "compact", "json"
+      show_stats: true
+      stats_interval: 100  # show stats every N messages
+      
+      # Message filtering
+      filter_by_status: null  # null or list like ["SUCCESS", "FAILED"]
+      filter_by_region: null  # null or list like ["US-WEST", "EU-WEST"]
+      filter_by_transaction_type: null  # null or list like ["WITHDRAWAL", "DEPOSIT"]
+      filter_by_amount_range: null  # null or [min, max] like [100, 1000]
+      
+      # Performance settings
+      max_poll_records: 100  # maximum number of records per poll
+      auto_commit_interval_ms: 1000  # auto commit interval
+      session_timeout_ms: 30000  # session timeout
+      heartbeat_interval_ms: 3000  # heartbeat interval
+      
+      # Output settings
+      output_file: null  # null or file path to also write to file
+      include_metadata: false  # include Kafka metadata in output
+      
+      # Alert settings
+      alert_on_failed_transactions: true
+      alert_threshold_amount: 1000.0  # alert on transactions above this amount
+      alert_on_status: ["FAILED", "TIMEOUT", "CARD_BLOCKED"]
+
+    # Logging configuration
+    logging:
+      level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+      format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+      
+    # Statistics configuration
+    statistics:
+      enable_detailed_stats: true
+      track_hourly_stats: false
+      track_daily_stats: false
+      reset_stats_on_restart: true 

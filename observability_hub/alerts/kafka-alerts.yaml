@@ -1,0 +1,220 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kafka-alerts
+  namespace: observability
+  labels:
+    app: kafka
+    component: alerts
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: kafka.rules
+    interval: 30s
+    rules:
+    
+    # === BROKER HEALTH ALERTS ===
+    - alert: KafkaBrokerDown
+      expr: kafka_server_replica_manager_leader_count < 1
+      for: 5m
+      labels:
+        severity: critical
+        component: kafka
+        alert_type: availability
+      annotations:
+        summary: "Kafka broker {{ $labels.instance }} is down"
+        description: |
+          Kafka broker {{ $labels.instance }} has no leader partitions for more than 5 minutes.
+          This indicates the broker is down or not functioning properly.
+          
+          Current leader count: {{ $value }}
+          Expected: > 0
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_restarting"
+        
+    - alert: KafkaBrokerNotReachable
+      expr: up{job="kafka-metrics"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        component: kafka
+        alert_type: availability
+      annotations:
+        summary: "Kafka broker {{ $labels.instance }} is not reachable"
+        description: |
+          Kafka broker {{ $labels.instance }} metrics endpoint is not reachable for more than 2 minutes.
+          This could indicate network issues or broker failure.
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_restarting"
+        
+    # === REPLICATION ALERTS ===
+    - alert: KafkaUnderReplicatedPartitions
+      expr: kafka_server_replica_manager_under_replicated_partitions > 0
+      for: 10m
+      labels:
+        severity: warning
+        component: kafka
+        alert_type: replication
+      annotations:
+        summary: "Kafka has under-replicated partitions"
+        description: |
+          Kafka cluster has {{ $value }} under-replicated partitions for more than 10 minutes.
+          This can lead to data loss if not addressed.
+          
+          Under-replicated partitions: {{ $value }}
+          Expected: 0
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_cluster_expansion"
+        
+    - alert: KafkaOfflinePartitions
+      expr: kafka_controller_offline_partitions_count > 0
+      for: 5m
+      labels:
+        severity: critical
+        component: kafka
+        alert_type: availability
+      annotations:
+        summary: "Kafka has offline partitions"
+        description: |
+          Kafka cluster has {{ $value }} offline partitions for more than 5 minutes.
+          These partitions are completely unavailable for read/write operations.
+          
+          Offline partitions: {{ $value }}
+          Expected: 0
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_cluster_expansion"
+        
+    # === PERFORMANCE ALERTS ===
+    - alert: KafkaHighProduceLatency
+      expr: kafka_network_requestmetrics_totaltimems{request="Produce",quantile="0.99"} > 1000
+      for: 10m
+      labels:
+        severity: warning
+        component: kafka
+        alert_type: performance
+      annotations:
+        summary: "High produce latency in Kafka"
+        description: |
+          Kafka produce requests are taking longer than expected.
+          99th percentile latency: {{ $value }}ms
+          Expected: < 1000ms
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_network_layer"
+        
+    - alert: KafkaHighConsumerLag
+      expr: kafka_consumer_lag_sum > 10000
+      for: 15m
+      labels:
+        severity: warning
+        component: kafka
+        alert_type: performance
+      annotations:
+        summary: "High consumer lag in Kafka"
+        description: |
+          Kafka consumer lag is {{ $value }} messages for more than 15 minutes.
+          This indicates consumers are falling behind producers.
+          
+          Consumer lag: {{ $value }} messages
+          Expected: < 10000 messages
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_consumer_lag"
+        
+    - alert: KafkaHighThroughput
+      expr: rate(kafka_server_brokertopicmetrics_messages_in_total[5m]) > 1000
+      for: 10m
+      labels:
+        severity: info
+        component: kafka
+        alert_type: performance
+      annotations:
+        summary: "High message throughput in Kafka"
+        description: |
+          Kafka is receiving messages at {{ $value }} per second for more than 10 minutes.
+          Monitor resource usage and scaling needs.
+          
+          Current rate: {{ $value }} messages/sec
+          Threshold: 1000 messages/sec
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_cluster_expansion"
+        
+    # === RESOURCE USAGE ALERTS ===
+    - alert: KafkaHighMemoryUsage
+      expr: kafka_server_gc_collections_ms_total > 1000
+      for: 10m
+      labels:
+        severity: warning
+        component: kafka
+        alert_type: resource
+      annotations:
+        summary: "High GC time in Kafka"
+        description: |
+          Kafka JVM garbage collection time is {{ $value }}ms for more than 10 minutes.
+          This indicates memory pressure and potential performance issues.
+          
+          GC time: {{ $value }}ms
+          Expected: < 1000ms
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_jvm"
+        
+    - alert: KafkaHighDiskUsage
+      expr: kafka_log_size > 5000000000  # 5GB
+      for: 10m
+      labels:
+        severity: warning
+        component: kafka
+        alert_type: resource
+      annotations:
+        summary: "High disk usage in Kafka"
+        description: |
+          Kafka log size is {{ $value | humanize1024 }}B for more than 10 minutes.
+          Monitor disk space and consider log retention policies.
+          
+          Current log size: {{ $value | humanize1024 }}B
+          Threshold: 5GB
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_diskspace"
+        
+    # === CONTROLLER ALERTS ===
+    - alert: KafkaControllerElectionRateHigh
+      expr: rate(kafka_controller_kafkacontroller_controllerchangerate_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: kafka
+        alert_type: stability
+      annotations:
+        summary: "High controller election rate in Kafka"
+        description: |
+          Kafka controller elections are happening at {{ $value }} per second.
+          This indicates cluster instability.
+          
+          Controller election rate: {{ $value }}/sec
+          Expected: < 0.1/sec (rare elections)
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_controller"
+        
+    - alert: KafkaNoActiveController
+      expr: kafka_controller_kafkacontroller_activecontrollercount < 1
+      for: 2m
+      labels:
+        severity: critical
+        component: kafka
+        alert_type: availability
+      annotations:
+        summary: "No active Kafka controller"
+        description: |
+          Kafka cluster has no active controller for more than 2 minutes.
+          This prevents topic and partition management operations.
+          
+          Active controllers: {{ $value }}
+          Expected: 1
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_controller"
+        
+    # === TOPIC HEALTH ALERTS ===
+    - alert: KafkaTopicSizeGrowthRate
+      expr: rate(kafka_log_size[1h]) > 100000000  # 100MB/hour
+      for: 30m
+      labels:
+        severity: info
+        component: kafka
+        alert_type: capacity
+      annotations:
+        summary: "Rapid topic size growth in Kafka"
+        description: |
+          Topic {{ $labels.topic }} is growing at {{ $value | humanize1024 }}B/hour.
+          Monitor disk space and retention policies.
+          
+          Growth rate: {{ $value | humanize1024 }}B/hour
+          Threshold: 100MB/hour
+        runbook_url: "https://kafka.apache.org/documentation/#basic_ops_diskspace" 

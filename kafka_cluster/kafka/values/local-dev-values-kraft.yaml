@@ -1,0 +1,86 @@
+# Kafka Local Development Configuration - KRaft Mode
+# Optimized for Docker Desktop on macOS with modern Kafka 4.0
+
+# === KRAFT MODE (Modern Kafka without ZooKeeper) ===
+kraft:
+  enabled: true                          # Use KRaft mode for Kafka 4.0
+
+# === CONTROLLER CONFIGURATION ===
+controller:
+  replicaCount: 1                        # Single controller for local dev
+  controllerOnly: true                   # Dedicated controller (not combined with broker)
+  resourcesPreset: "small"               # Use preset for resources
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+
+# === BROKER CONFIGURATION ===
+broker:
+  replicaCount: 1                        # Single dedicated broker
+  resourcesPreset: "small"               # Use preset for resources
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+
+# === VOLUME PERMISSIONS ===
+volumePermissions:
+  enabled: true                          # Fix permission issues on Docker Desktop
+
+# === AUTHENTICATION ===
+auth:
+  clientProtocol: plaintext              # Simple auth for local dev
+  interBrokerProtocol: plaintext
+
+# === LISTENERS ===
+listeners:
+  client:
+    containerPort: 9092
+    protocol: PLAINTEXT
+    name: CLIENT
+  controller:
+    name: CONTROLLER
+    containerPort: 9093
+    protocol: PLAINTEXT
+  interbroker:
+    containerPort: 9094
+    protocol: PLAINTEXT
+    name: INTERNAL
+
+# === EXTERNAL ACCESS ===
+externalAccess:
+  enabled: false                         # No external access needed locally
+
+# === METRICS ===
+metrics:
+  kafka:
+    enabled: true                        # Enable Kafka metrics
+  jmx:
+    enabled: true                        # Enable JMX metrics
+
+# === PROVISIONING ===
+# Disabled for initial deployment - will enable after basic cluster works
+# provisioning:
+#   enabled: true
+
+# === SERVICE CONFIGURATION ===
+service:
+  type: ClusterIP                        # Internal service only
+  ports:
+    client: 9092
+
+# === LOGGING ===
+logLevel: INFO
+logsDirs: "/opt/bitnami/kafka/logs"
+
+# === JVM SETTINGS ===
+heapOpts: "-Xmx512m -Xms512m"           # Reasonable heap for local dev
+
+# === AUTO TOPIC CREATION ===
+# autoCreateTopicsEnable: true             # Will enable after basic deployment works
+
+offsets:
+  topic:
+    replicationFactor: 1                 # Single replica for consumer offsets
+    numPartitions: 50                    # Standard partitions for offsets topic 

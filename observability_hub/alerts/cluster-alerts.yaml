@@ -1,0 +1,255 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cluster-alerts
+  namespace: observability
+  labels:
+    app: kubernetes
+    component: alerts
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: cluster.rules
+    interval: 30s
+    rules:
+    
+    # === NODE HEALTH ALERTS ===
+    - alert: NodeDown
+      expr: up{job="kubernetes-nodes"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: kubernetes
+        alert_type: availability
+      annotations:
+        summary: "Node {{ $labels.instance }} is down"
+        description: |
+          Node {{ $labels.instance }} has been down for more than 5 minutes.
+          This may affect workload availability and cluster capacity.
+        runbook_url: "https://kubernetes.io/docs/concepts/architecture/nodes/"
+        
+    - alert: NodeHighCPUUsage
+      expr: (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: resource
+      annotations:
+        summary: "High CPU usage on node {{ $labels.instance }}"
+        description: |
+          Node {{ $labels.instance }} has high CPU usage of {{ $value | printf "%.2f" }}% for more than 10 minutes.
+          This may impact workload performance.
+          
+          Current CPU usage: {{ $value | printf "%.2f" }}%
+          Threshold: 80%
+        runbook_url: "https://kubernetes.io/docs/tasks/debug-application-cluster/resource-usage-monitoring/"
+        
+    - alert: NodeHighMemoryUsage
+      expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+      for: 10m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: resource
+      annotations:
+        summary: "High memory usage on node {{ $labels.instance }}"
+        description: |
+          Node {{ $labels.instance }} has high memory usage of {{ $value | printf "%.2f" }}% for more than 10 minutes.
+          This may cause pod evictions or scheduling issues.
+          
+          Current memory usage: {{ $value | printf "%.2f" }}%
+          Threshold: 85%
+        runbook_url: "https://kubernetes.io/docs/tasks/debug-application-cluster/resource-usage-monitoring/"
+        
+    - alert: NodeDiskSpaceRunningLow
+      expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 85
+      for: 15m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: resource
+      annotations:
+        summary: "Low disk space on node {{ $labels.instance }}"
+        description: |
+          Node {{ $labels.instance }} root filesystem usage is {{ $value | printf "%.2f" }}% for more than 15 minutes.
+          This may cause pod scheduling failures or node issues.
+          
+          Current disk usage: {{ $value | printf "%.2f" }}%
+          Threshold: 85%
+        runbook_url: "https://kubernetes.io/docs/concepts/policy/node-resource-managers/"
+        
+    # === POD HEALTH ALERTS ===
+    - alert: PodCrashLooping
+      expr: rate(kube_pod_container_status_restarts_total[5m]) * 300 > 1
+      for: 5m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: availability
+      annotations:
+        summary: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is crash looping"
+        description: |
+          Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is restarting frequently.
+          This indicates application issues or resource constraints.
+          
+          Restart rate: {{ $value | printf "%.2f" }} restarts/5min
+          Expected: < 1 restart/5min
+        runbook_url: "https://kubernetes.io/docs/tasks/debug-application-cluster/debug-pod-replication-controller/"
+        
+    - alert: PodNotReady
+      expr: kube_pod_status_ready{condition="false"} == 1
+      for: 10m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: availability
+      annotations:
+        summary: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is not ready"
+        description: |
+          Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been not ready for more than 10 minutes.
+          Check pod logs and resource constraints.
+        runbook_url: "https://kubernetes.io/docs/tasks/debug-application-cluster/debug-pod-replication-controller/"
+        
+    - alert: PodOOMKilled
+      expr: increase(kube_pod_container_status_restarts_total[1h]) > 0 and on (pod,namespace) kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+      for: 0m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: resource
+      annotations:
+        summary: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} was OOMKilled"
+        description: |
+          Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} was killed due to out of memory.
+          Consider increasing memory limits or investigating memory leaks.
+        runbook_url: "https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/"
+        
+    # === WORKLOAD ALERTS ===
+    - alert: DeploymentReplicasMismatch
+      expr: kube_deployment_spec_replicas != kube_deployment_status_replicas_available
+      for: 10m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: availability
+      annotations:
+        summary: "Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} has mismatched replicas"
+        description: |
+          Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} has {{ $labels.spec_replicas }} desired replicas but only {{ $labels.available_replicas }} available.
+          This may indicate scheduling issues or resource constraints.
+        runbook_url: "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"
+        
+    - alert: StatefulSetReplicasMismatch
+      expr: kube_statefulset_status_replicas_ready != kube_statefulset_status_replicas
+      for: 10m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: availability
+      annotations:
+        summary: "StatefulSet {{ $labels.statefulset }} in namespace {{ $labels.namespace }} has mismatched replicas"
+        description: |
+          StatefulSet {{ $labels.statefulset }} in namespace {{ $labels.namespace }} has replica mismatches.
+          Check for scheduling issues or storage problems.
+        runbook_url: "https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/"
+        
+    # === PERSISTENT VOLUME ALERTS ===
+    - alert: PersistentVolumeUsageHigh
+      expr: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes * 100 > 85
+      for: 15m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: resource
+      annotations:
+        summary: "High PV usage for {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }}"
+        description: |
+          Persistent volume {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is {{ $value | printf "%.2f" }}% full.
+          Consider expanding the volume or cleaning up data.
+          
+          Current usage: {{ $value | printf "%.2f" }}%
+          Threshold: 85%
+        runbook_url: "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+        
+    - alert: PersistentVolumeClaimPending
+      expr: kube_persistentvolumeclaim_status_phase{phase="Pending"} == 1
+      for: 10m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: availability
+      annotations:
+        summary: "PVC {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is pending"
+        description: |
+          PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} has been pending for more than 10 minutes.
+          Check storage class availability and node capacity.
+        runbook_url: "https://kubernetes.io/docs/concepts/storage/persistent-volumes/"
+        
+    # === CLUSTER RESOURCE ALERTS ===
+    - alert: ClusterCPUUsageHigh
+      expr: (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100 > 75
+      for: 15m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: resource
+      annotations:
+        summary: "High cluster CPU usage"
+        description: |
+          Cluster CPU usage is {{ $value | printf "%.2f" }}% for more than 15 minutes.
+          Consider scaling the cluster or optimizing workloads.
+          
+          Current cluster CPU usage: {{ $value | printf "%.2f" }}%
+          Threshold: 75%
+        runbook_url: "https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/"
+        
+    - alert: ClusterMemoryUsageHigh
+      expr: (1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100 > 80
+      for: 15m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: resource
+      annotations:
+        summary: "High cluster memory usage"
+        description: |
+          Cluster memory usage is {{ $value | printf "%.2f" }}% for more than 15 minutes.
+          Consider scaling the cluster or optimizing workloads.
+          
+          Current cluster memory usage: {{ $value | printf "%.2f" }}%
+          Threshold: 80%
+        runbook_url: "https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/"
+        
+    # === API SERVER ALERTS ===
+    - alert: KubernetesApiServerDown
+      expr: up{job="kubernetes-apiservers"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: kubernetes
+        alert_type: availability
+      annotations:
+        summary: "Kubernetes API Server is down"
+        description: |
+          Kubernetes API Server {{ $labels.instance }} has been down for more than 5 minutes.
+          This will prevent all cluster operations.
+        runbook_url: "https://kubernetes.io/docs/concepts/overview/kubernetes-api/"
+        
+    - alert: KubernetesApiServerLatencyHigh
+      expr: histogram_quantile(0.99, sum by (le) (rate(apiserver_request_duration_seconds_bucket{verb!="WATCH"}[5m]))) > 1
+      for: 10m
+      labels:
+        severity: warning
+        component: kubernetes
+        alert_type: performance
+      annotations:
+        summary: "High Kubernetes API Server latency"
+        description: |
+          Kubernetes API Server 99th percentile latency is {{ $value | printf "%.2f" }}s for more than 10 minutes.
+          This may affect cluster operations and workload deployments.
+          
+          Current 99th percentile latency: {{ $value | printf "%.2f" }}s
+          Threshold: 1s
+        runbook_url: "https://kubernetes.io/docs/concepts/overview/kubernetes-api/" 

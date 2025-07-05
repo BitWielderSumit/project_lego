@@ -1,0 +1,26 @@
+# Minimal Kafka Configuration - Override Only Approach
+# Only specifying values we want to change from defaults
+
+# Single replica for local development (default is 3)
+controller:
+  replicaCount: 1
+
+# Reduced resources for local machine (defaults are higher)
+resources:
+  requests:
+    memory: 512Mi    # Default: 1Gi
+    cpu: 250m        # Default: 500m
+  limits:
+    memory: 1Gi      # Default: 2Gi
+    cpu: 1000m       # Default: 2000m
+
+# Smaller storage for local (default: much larger)
+persistence:
+  size: 8Gi          # Default: varies by environment
+
+# Simple authentication for local (default: more complex)
+auth:
+  clientProtocol: plaintext
+  interBrokerProtocol: plaintext
+
+# That's it! Everything else uses chart defaults automatically 

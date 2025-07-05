@@ -1,0 +1,220 @@
+# Kafka Telemetry Integration Values
+# Enhances existing Kafka deployment with complete Prometheus monitoring
+
+# === KAFKA METRICS CONFIGURATION ===
+# These values should be merged with your existing Kafka values
+
+# Enhanced JMX metrics configuration
+metrics:
+  kafka:
+    enabled: true
+    
+  jmx:
+    enabled: true
+    
+    # JMX exporter configuration
+    containerPorts:
+      metrics: 5556
+      
+    # Resource allocation for metrics
+    resourcesPreset: "small"
+    
+    # Service configuration for metrics exposure
+    service:
+      enabled: true
+      ports:
+        metrics: 5556
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5556"
+        prometheus.io/path: "/metrics"
+      labels:
+        app: kafka
+        component: metrics
+        
+    # Liveness and readiness probes
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+      
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+      successThreshold: 1
+  
+  # ServiceMonitor for Prometheus Operator
+  serviceMonitor:
+    enabled: true
+    
+    # ServiceMonitor configuration
+    namespace: observability
+    labels:
+      app: kafka
+      component: metrics
+      
+    # Scraping configuration
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics
+    
+    # Target port for metrics
+    port: metrics
+    
+    # Relabeling configuration
+    relabelings:
+      - sourceLabels: [__meta_kubernetes_service_name]
+        separator: ;
+        regex: ^(.*)$
+        targetLabel: service
+        replacement: $1
+        action: replace
+        
+      - sourceLabels: [__meta_kubernetes_namespace]
+        separator: ;
+        regex: ^(.*)$
+        targetLabel: namespace
+        replacement: $1
+        action: replace
+        
+    # Metric relabeling
+    metricRelabelings:
+      - sourceLabels: [__name__]
+        regex: kafka_(.+)
+        targetLabel: __name__
+        replacement: kafka_${1}
+        action: replace
+        
+    # Honor labels from target
+    honorLabels: false
+    
+    # Job label
+    jobLabel: kafka-metrics
+    
+    # Selector (empty to select all Kafka services)
+    selector:
+      matchLabels:
+        app: kafka
+        component: metrics
+  
+  # PrometheusRule for Kafka alerts
+  prometheusRule:
+    enabled: true
+    
+    # Rule configuration
+    namespace: observability
+    labels:
+      app: kafka
+      component: alerts
+      
+    # Kafka monitoring rules
+    groups:
+      - name: kafka.rules
+        interval: 30s
+        rules:
+          # === BROKER HEALTH RULES ===
+          - alert: KafkaBrokerDown
+            expr: kafka_server_replica_manager_leader_count < 1
+            for: 5m
+            labels:
+              severity: critical
+              component: kafka
+            annotations:
+              summary: "Kafka broker {{`{{ $labels.instance }}`}} is down"
+              description: "Kafka broker {{`{{ $labels.instance }}`}} has no leader partitions for more than 5 minutes"
+              
+          - alert: KafkaReplicasLagging
+            expr: kafka_server_replica_manager_under_replicated_partitions > 0
+            for: 10m
+            labels:
+              severity: warning
+              component: kafka
+            annotations:
+              summary: "Kafka has under-replicated partitions"
+              description: "Kafka has {{`{{ $value }}`}} under-replicated partitions for more than 10 minutes"
+              
+          # === TOPIC HEALTH RULES ===
+          - alert: KafkaTopicPartitionsOffline
+            expr: kafka_controller_offline_partitions_count > 0
+            for: 5m
+            labels:
+              severity: critical
+              component: kafka
+            annotations:
+              summary: "Kafka has offline partitions"
+              description: "Kafka has {{`{{ $value }}`}} offline partitions for more than 5 minutes"
+              
+          # === PERFORMANCE RULES ===
+          - alert: KafkaHighProduceRate
+            expr: rate(kafka_server_brokertopicmetrics_messages_in_total[5m]) > 1000
+            for: 10m
+            labels:
+              severity: warning
+              component: kafka
+            annotations:
+              summary: "High message produce rate in Kafka"
+              description: "Kafka is receiving messages at {{`{{ $value }}`}} per second for more than 10 minutes"
+              
+          - alert: KafkaHighConsumerLag
+            expr: kafka_consumer_lag_sum > 5000
+            for: 10m
+            labels:
+              severity: warning
+              component: kafka
+            annotations:
+              summary: "High consumer lag in Kafka"
+              description: "Kafka consumer lag is {{`{{ $value }}`}} messages for more than 10 minutes"
+              
+          # === RESOURCE USAGE RULES ===
+          - alert: KafkaHighMemoryUsage
+            expr: kafka_server_gc_collections_ms_total > 1000
+            for: 10m
+            labels:
+              severity: warning
+              component: kafka
+            annotations:
+              summary: "High GC time in Kafka"
+              description: "Kafka GC time is {{`{{ $value }}`}}ms for more than 10 minutes"
+              
+          - alert: KafkaHighDiskUsage
+            expr: kafka_log_size > 5000000000  # 5GB
+            for: 10m
+            labels:
+              severity: warning
+              component: kafka
+            annotations:
+              summary: "High disk usage in Kafka"
+              description: "Kafka log size is {{`{{ $value }}`}} bytes for more than 10 minutes"
+
+# === ADDITIONAL MONITORING COMPONENTS ===
+# Components to add to your existing Kafka deployment
+
+# Enhanced logging configuration
+logLevel: INFO
+logsDirs: "/opt/bitnami/kafka/logs"
+
+# JVM monitoring settings
+heapOpts: "-Xmx512m -Xms512m -XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps"
+
+# Additional service labels for monitoring
+service:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "5556"
+    prometheus.io/path: "/metrics"
+  labels:
+    app: kafka
+    component: broker
+    monitoring: enabled
+
+# Pod labels for monitoring
+podLabels:
+  app: kafka
+  component: broker
+  monitoring: enabled 

@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atm-producer
+  namespace: kafka
+  labels:
+    app: atm-producer
+    component: producer
+    system: kafka-pub-sub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atm-producer
+  template:
+    metadata:
+      labels:
+        app: atm-producer
+        component: producer
+        system: kafka-pub-sub
+    spec:
+      containers:
+      - name: atm-producer
+        image: atm-producer:latest
+        imagePullPolicy: Never
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka-local.kafka.svc.cluster.local:9092"
+        - name: KAFKA_TOPIC
+          value: "atm-transactions"
+        - name: PRODUCER_RATE
+          value: "5"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import kafka; print('OK')"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import kafka; print('OK')"
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: config-volume
+        configMap:
+          name: atm-producer-config
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atm-producer-config
+  namespace: kafka
+  labels:
+    app: atm-producer
+    component: producer
+    system: kafka-pub-sub
+data:
+  producer-config.yaml: |
+    kafka:
+      bootstrap_servers: "kafka-local.kafka.svc.cluster.local:9092"
+      topic: "atm-transactions"
+
+    producer:
+      # Message rate configuration
+      rate: 5  # messages per second
+      burst_mode: false  # if true, sends messages as fast as possible
+      batch_size: 100  # number of messages to batch together
+      
+      # Producer reliability settings
+      acks: "all"  # wait for all replicas to acknowledge
+      retries: 3
+      
+      # Performance tuning
+      batch_size_bytes: 16384
+      linger_ms: 10  # wait time to batch messages
+      buffer_memory: 33554432  # 32MB buffer
+      
+      # Compression
+      compression_type: "snappy"  # none, gzip, snappy, lz4
+
+    # Data generation settings
+    data_generation:
+      # ATM simulation settings
+      num_atms: 100
+      regions: ["US-WEST", "US-EAST", "US-CENTRAL", "EU-WEST", "EU-CENTRAL", "APAC"]
+      
+      # Transaction distribution weights
+      transaction_types:
+        WITHDRAWAL: 0.60
+        BALANCE_INQUIRY: 0.25
+        DEPOSIT: 0.10
+        TRANSFER: 0.05
+        
+      # Status distribution weights
+      status_codes:
+        SUCCESS: 0.85
+        FAILED: 0.08
+        TIMEOUT: 0.04
+        INSUFFICIENT_FUNDS: 0.02
+        CARD_BLOCKED: 0.01
+        
+      # Amount ranges by transaction type
+      amount_ranges:
+        WITHDRAWAL: [20, 500]
+        DEPOSIT: [50, 1000]
+        TRANSFER: [100, 2000]
+        BALANCE_INQUIRY: [0, 0]
+        
+      # Supported currencies
+      currencies: ["USD", "EUR", "GBP", "JPY", "CAD"]
+      
+      # ATM locations
+      locations:
+        - "Downtown Branch"
+        - "Mall Center"
+        - "Airport Terminal"
+        - "University Campus"
+        - "Shopping Center"
+        - "Bank Branch"
+        - "Gas Station"
+        - "Grocery Store"
+        - "Hotel Lobby"
+        - "Train Station" 
