@@ -6,6 +6,9 @@
 # Git switchboard (local account management)
 git-switchboard/
 
+# Specific files to ignore
+kafka_cluster/kafka_war_stories/cursor_kafka_cluster.md
+
 # OS generated files
 .DS_Store
 .DS_Store?
