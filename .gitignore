@@ -8,6 +8,7 @@ git-switchboard/
 
 # Specific files to ignore
 kafka_cluster/kafka_war_stories/cursor_kafka_cluster.md
+kafka_cluster/AI_CONTEXT.md
 
 # OS generated files
 .DS_Store
