@@ -10,6 +10,9 @@ git-switchboard/
 kafka_cluster/kafka_war_stories/cursor_kafka_cluster.md
 kafka_cluster/AI_CONTEXT.md
 
+# Safari Books (contains downloaded content)
+safaribooks/
+
 # OS generated files
 .DS_Store
 .DS_Store?
