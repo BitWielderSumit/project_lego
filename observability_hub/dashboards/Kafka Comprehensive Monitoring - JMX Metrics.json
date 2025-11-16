@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 20,
+  "id": 21,
   "links": [],
   "panels": [
     {
@@ -1394,10 +1394,6 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1405,20 +1401,17 @@
           },
           "custom": {
             "axisBorderShow": false,
-            "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
-              "vis": false,
-              "viz": false
+              "vis": false
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
@@ -1427,7 +1420,7 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -1445,12 +1438,16 @@
                 "color": "green"
               },
               {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
                 "color": "red",
-                "value": 80
+                "value": 5000
               }
             ]
           },
-          "unit": "Bps"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -1463,31 +1460,39 @@
       "id": 27,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "calcs": [
+            "last",
+            "max"
+          ],
+          "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.0.2",
       "targets": [
         {
-          "expr": "rate(container_network_receive_bytes_total{pod=~\"kafka.*\"}[5m])",
-          "legendFormat": "{{pod}} - Network Receive",
+          "expr": "kafka_consumer_lag_sum{job=\"kafka-metrics\"}",
+          "legendFormat": "Consumer Lag - {{topic}} - {{consumergroup}}",
           "refId": "A"
         },
         {
-          "expr": "rate(container_network_transmit_bytes_total{pod=~\"kafka.*\"}[5m])",
-          "legendFormat": "{{pod}} - Network Transmit",
+          "expr": "kafka_consumergroup_lag{job=\"kafka-metrics\"}",
+          "legendFormat": "Group Lag - {{topic}} - {{consumergroup}}",
           "refId": "B"
+        },
+        {
+          "expr": "sum by (topic, consumergroup) (kafka_consumer_lag_sum{job=\"kafka-metrics\"})",
+          "legendFormat": "Total Lag - {{topic}} - {{consumergroup}}",
+          "refId": "C"
         }
       ],
-      "title": "Kafka Pod Network I/O",
+      "title": "Consumer Lag Monitoring",
       "type": "timeseries"
     }
   ],
