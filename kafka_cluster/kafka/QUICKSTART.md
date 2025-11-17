@@ -1,6 +1,6 @@
 # Kafka Quick Start Guide
 
-This guide helps you quickly deploy and test Bitnami Kafka on your local Docker Desktop Kubernetes cluster.
+This guide helps you quickly deploy and test Kafka with KRaft mode using Bitnami Secure Images on your local Docker Desktop Kubernetes cluster.
 
 ## 🚀 Quick Deployment
 
@@ -18,7 +18,8 @@ This guide helps you quickly deploy and test Bitnami Kafka on your local Docker 
 This script will:
 - ✅ Check prerequisites
 - ✅ Create namespace
-- ✅ Deploy Kafka with optimized local settings
+- ✅ Deploy Kafka in KRaft mode (no ZooKeeper)
+- ✅ Apply consumer offsets fix for KRaft
 - ✅ Show deployment status and connection info
 
 ### 2. Test Your Deployment
@@ -42,7 +43,7 @@ kubectl create namespace kafka
 helm upgrade --install kafka-local \
   oci://registry-1.docker.io/bitnamicharts/kafka \
   --namespace kafka \
-  --values kafka/values/local-dev-values.yaml \
+  --values kafka/values/values.yaml \
   --wait
 ```
 
@@ -64,20 +65,20 @@ kubectl run kafka-client --rm -i --tty \
 ### Create a Topic
 ```bash
 kafka-topics.sh --create --topic my-topic \
-  --bootstrap-server kafka.kafka.svc.cluster.local:9092 \
+  --bootstrap-server kafka-local.kafka.svc.cluster.local:9092 \
   --partitions 1 --replication-factor 1
 ```
 
 ### Send Messages (Producer)
 ```bash
 kafka-console-producer.sh --topic my-topic \
-  --bootstrap-server kafka.kafka.svc.cluster.local:9092
+  --bootstrap-server kafka-local.kafka.svc.cluster.local:9092
 ```
 
 ### Read Messages (Consumer)
 ```bash
 kafka-console-consumer.sh --topic my-topic \
-  --bootstrap-server kafka.kafka.svc.cluster.local:9092 \
+  --bootstrap-server kafka-local.kafka.svc.cluster.local:9092 \
   --from-beginning
 ```
 
@@ -85,10 +86,14 @@ kafka-console-consumer.sh --topic my-topic \
 
 | File | Purpose |
 |------|---------|
-| `kafka/values/local-dev-values.yaml` | Main configuration for local development |
-| `kafka/values/minimal-kafka-values.yaml` | Minimal override-only config |
-| `kafka/values/production-values.yaml` | Production template |
+| `kafka/values/values.yaml` | Single configuration file (KRaft mode, Bitnami Secure Images) |
 | `kafka/config/client.properties` | Client connection settings |
+
+### About the Configuration
+- **KRaft Mode**: Modern Kafka without ZooKeeper dependency
+- **Bitnami Secure Images**: Using `:latest` tag (free development tier)
+- **Single File**: All settings in one place for simplicity
+- **Auto-updating**: :latest tag means you always get the newest stable version
 
 ## 📊 Monitoring
 
@@ -104,7 +109,7 @@ kubectl top pods -n kafka
 
 ### Port Forward for External Access
 ```bash
-kubectl port-forward svc/kafka 9092:9092 -n kafka
+kubectl port-forward svc/kafka-local 9092:9092 -n kafka
 ```
 
 ## 🗑️ Cleanup
@@ -117,8 +122,9 @@ kubectl port-forward svc/kafka 9092:9092 -n kafka
 ## 🔗 Connection Information
 
 **From inside Kubernetes:**
-- Bootstrap Servers: `kafka.kafka.svc.cluster.local:9092`
+- Bootstrap Servers: `kafka-local.kafka.svc.cluster.local:9092`
 - Protocol: `PLAINTEXT`
+- Mode: KRaft (no ZooKeeper)
 
 **From localhost (with port-forward):**
 - Bootstrap Servers: `localhost:9092`
@@ -127,9 +133,9 @@ kubectl port-forward svc/kafka 9092:9092 -n kafka
 ## 📚 Next Steps
 
 1. **Application Integration**: Use `kafka/config/client.properties` in your apps
-2. **Topic Management**: Create topics using the provisioning feature
-3. **Monitoring**: Add Prometheus/Grafana for observability
-4. **Production**: Use `kafka/values/production-values.yaml` as a starting point
+2. **Topic Management**: Create topics using Kafka CLI or programmatically
+3. **Monitoring**: Add Prometheus/Grafana for observability (metrics already enabled)
+4. **Production**: Consider version pinning or Strimzi operator for production deployments
 
 ## 🆘 Troubleshooting
 
@@ -142,7 +148,7 @@ kubectl logs -n kafka -l app.kubernetes.io/name=kafka
 ### Connection Issues
 ```bash
 kubectl get svc -n kafka
-kubectl port-forward svc/kafka 9092:9092 -n kafka
+kubectl port-forward svc/kafka-local 9092:9092 -n kafka
 ```
 
 ### Storage Issues

@@ -1,34 +1,9 @@
 #!/bin/bash
 
 # Kafka Deployment Script
-# Deploys Bitnami Kafka with custom configuration
+# Deploys Bitnami Kafka with KRaft mode using Bitnami Secure Images
 
 set -e  # Exit on any error
-
-# Help function
-show_help() {
-    echo "Kafka Deployment Script"
-    echo "Deploys Bitnami Kafka with custom configuration"
-    echo ""
-    echo "Usage: $0 [MODE|VALUES_FILE]"
-    echo ""
-    echo "Available modes:"
-    echo "  kraft       - Deploy with KRaft mode (no ZooKeeper)"
-    echo "  minimal     - Deploy with minimal configuration"
-    echo "  production  - Deploy with production-ready configuration"
-    echo "  help        - Show this help message"
-    echo ""
-    echo "Or specify a custom values file path:"
-    echo "  $0 path/to/custom-values.yaml"
-    echo ""
-    echo "Default: Uses local-dev-values.yaml"
-    echo ""
-    echo "Examples:"
-    echo "  $0                    # Default local development"
-    echo "  $0 kraft              # KRaft mode"
-    echo "  $0 minimal            # Minimal setup"
-    echo "  $0 custom-values.yaml # Custom configuration"
-}
 
 # Colors for output
 RED='\033[0;31m'
@@ -40,25 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 NAMESPACE="kafka"
 RELEASE_NAME="kafka-local"
-VALUES_FILE="kafka/values/local-dev-values.yaml"
-
-# Handle command line arguments
-if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    show_help
-    exit 0
-elif [ "$1" = "kraft" ]; then
-    VALUES_FILE="kafka/values/local-dev-values-kraft.yaml"
-    echo -e "${YELLOW}🔧 Using KRaft mode configuration${NC}"
-elif [ "$1" = "minimal" ]; then
-    VALUES_FILE="kafka/values/minimal-kafka-values.yaml"
-    echo -e "${YELLOW}🔧 Using minimal configuration${NC}"
-elif [ "$1" = "production" ]; then
-    VALUES_FILE="kafka/values/production-values.yaml"
-    echo -e "${YELLOW}🔧 Using production configuration${NC}"
-elif [ -n "$1" ]; then
-    echo -e "${YELLOW}🔧 Using custom values file: $1${NC}"
-    VALUES_FILE="$1"
-fi
+VALUES_FILE="kafka/values/values.yaml"
 
 echo -e "${BLUE}🚀 Starting Kafka Deployment${NC}"
 echo -e "${BLUE}📋 Configuration:${NC}"
@@ -133,13 +90,9 @@ create_consumer_offsets_topic() {
     fi
 }
 
-# Apply the fix for KRaft mode deployments
-if [[ "${VALUES_FILE}" == *"kraft"* ]]; then
-    echo -e "${YELLOW}  🎯 KRaft mode detected - applying consumer offsets fix${NC}"
-    create_consumer_offsets_topic
-else
-    echo -e "${BLUE}  ℹ️  Consumer offsets fix not needed for this deployment mode${NC}"
-fi
+# Apply the fix for KRaft mode (always enabled)
+echo -e "${YELLOW}  🎯 Applying KRaft mode consumer offsets fix${NC}"
+create_consumer_offsets_topic
 
 echo -e "${GREEN}✅ Post-deployment fixes completed!${NC}"
 
@@ -172,8 +125,6 @@ echo ""
 echo "4. View logs:"
 echo "   kubectl logs -f deployment/${RELEASE_NAME} -n ${NAMESPACE}"
 echo ""
-if [[ "${VALUES_FILE}" == *"kraft"* ]]; then
-    echo -e "${GREEN}💡 Note: __consumer_offsets topic was automatically created for KRaft mode${NC}"
-fi
-
+echo -e "${GREEN}💡 Note: __consumer_offsets topic was automatically created for KRaft mode${NC}"
+echo ""
 echo -e "${GREEN}🎉 Kafka is ready to use!${NC}" 

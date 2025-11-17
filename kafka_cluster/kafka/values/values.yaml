@@ -1,9 +1,18 @@
-# Kafka Local Development Configuration - KRaft Mode
-# Optimized for Docker Desktop on macOS with modern Kafka 4.0
+# Kafka Local Development Configuration
+# Single configuration file using Bitnami Secure Images with KRaft mode
+# Optimized for Docker Desktop on macOS
+
+# === IMAGE CONFIGURATION ===
+# Using Bitnami Legacy Images (stable, proven version)
+# Note: This is Kafka 3.9.0 - stable and suitable for local development
+image:
+  registry: docker.io
+  repository: bitnamilegacy/kafka
+  tag: 3.9.0-debian-12-r4
 
 # === KRAFT MODE (Modern Kafka without ZooKeeper) ===
 kraft:
-  enabled: true                          # Use KRaft mode for Kafka 4.0
+  enabled: true
 
 # === CONTROLLER CONFIGURATION ===
 controller:
@@ -14,6 +23,10 @@ controller:
     enabled: true
     size: 8Gi
     storageClass: ""
+  # Explicit KRaft configuration for controller quorum
+  extraEnvVars:
+    - name: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+      value: "0@kafka-local-controller-0.kafka-local-controller-headless.kafka.svc.cluster.local:9093"
 
 # === BROKER CONFIGURATION ===
 broker:
@@ -53,16 +66,12 @@ externalAccess:
   enabled: false                         # No external access needed locally
 
 # === METRICS ===
+# Disabled for local dev - JMX exporter image also deprecated by Bitnami
 metrics:
   kafka:
-    enabled: true                        # Enable Kafka metrics
+    enabled: false
   jmx:
-    enabled: true                        # Enable JMX metrics
-
-# === PROVISIONING ===
-# Disabled for initial deployment - will enable after basic cluster works
-# provisioning:
-#   enabled: true
+    enabled: false
 
 # === SERVICE CONFIGURATION ===
 service:
@@ -75,12 +84,11 @@ logLevel: INFO
 logsDirs: "/opt/bitnami/kafka/logs"
 
 # === JVM SETTINGS ===
-heapOpts: "-Xmx512m -Xms512m"           # Reasonable heap for local dev
+heapOpts: "-Xmx512m -Xms512m"            # Reasonable heap for local dev
 
-# === AUTO TOPIC CREATION ===
-# autoCreateTopicsEnable: true             # Will enable after basic deployment works
-
+# === CONSUMER OFFSETS ===
 offsets:
   topic:
     replicationFactor: 1                 # Single replica for consumer offsets
-    numPartitions: 50                    # Standard partitions for offsets topic 
+    numPartitions: 50                    # Standard partitions for offsets topic
+

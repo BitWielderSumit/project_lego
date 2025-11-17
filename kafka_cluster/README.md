@@ -1,11 +1,11 @@
 # Project Lego
 
 ## Overview
-**Project Lego** - A comprehensive Kafka deployment project for local development using Bitnami Kafka charts on Kubernetes (Docker Desktop).
+**Project Lego** - A streamlined Kafka deployment project for local development using Bitnami Secure Images on Kubernetes (Docker Desktop).
 
-- **Status**: Kafka configuration complete, ready for deployment
-- **Primary Focus**: Bitnami Kafka deployment on Docker Desktop Kubernetes
-- **Configuration Approach**: Override-only (maintain ~60-100 lines vs 2,400+ defaults)
+- **Status**: Ready for deployment with single configuration file
+- **Primary Focus**: KRaft mode Kafka deployment on Docker Desktop Kubernetes
+- **Configuration Approach**: Single values file with clear, maintainable overrides
 
 ## Quick Start
 ```bash
@@ -27,19 +27,14 @@ project_lego/
     ├── QUICKSTART.md                      # User guide
     ├── config/                            # Client configurations
     │   └── client.properties              # Kafka client settings
-    ├── docs/                              # Documentation
-    │   └── configuration-strategy.md      # Architecture decisions
     ├── manifests/                         # Kubernetes manifests
     │   └── kafka-namespace.yaml           # Namespace definition
     ├── scripts/                           # Automation scripts
     │   ├── deploy-kafka.sh                # Main deployment
     │   ├── test-kafka.sh                  # Verification tests
     │   └── uninstall-kafka.sh             # Cleanup
-    └── values/                            # Helm configurations
-        ├── local-dev-values.yaml          # Primary config (optimized for local)
-        ├── minimal-kafka-values.yaml      # Absolute minimal overrides
-        ├── kafka-values.yaml              # Original comprehensive config
-        └── production-values.yaml         # Production template
+    └── values/                            # Helm configuration
+        └── values.yaml                    # Single configuration file (KRaft mode)
 ```
 
 ## Requirements
@@ -56,11 +51,12 @@ project_lego/
 - **Chart Version**: Latest (32.3.0 as of last check)
 
 ## Features
-- ✅ **Override-only configuration** - Only specify values you want to change
+- ✅ **KRaft mode** - Modern Kafka without ZooKeeper dependency
+- ✅ **Bitnami Secure Images** - Latest stable images (development tier)
+- ✅ **Single configuration file** - Simple, maintainable values.yaml
 - ✅ **Local development optimized** - Resource settings for Docker Desktop
 - ✅ **Automated deployment** - One-command setup and teardown
 - ✅ **Comprehensive testing** - Automated verification scripts
-- ✅ **Production ready** - Template for production deployments
 - ✅ **Well documented** - Clear guides and examples
 - ✅ **Client configuration** - Pre-configured connection settings
 - ✅ **Metrics enabled** - Kafka and JMX metrics for monitoring
@@ -68,20 +64,22 @@ project_lego/
 ## Technical Architecture
 
 ### Kafka Deployment Configuration
-- **Local Optimizations**: Single replica, reduced resources, Docker Desktop compatibility
-- **Controller/Broker Replicas**: 1 each
+- **Mode**: KRaft (no ZooKeeper required)
+- **Image**: Bitnami Secure Images with :latest tag (auto-updating for development)
+- **Controller/Broker Replicas**: 1 each (local development)
 - **Resource Preset**: "small" for both controller and broker
 - **Storage**: 8Gi PVCs with default storage class
 - **Authentication**: Plaintext (no security for local dev)
-- **Provisioning**: Enabled with test-topic creation
+- **Metrics**: Kafka and JMX metrics enabled
 
 ### Technical Decisions Made
-1. **Override-Only Configuration**: Only specify changed values, not entire 2,400+ line config
-2. **Local Development Focus**: Single replica, reduced resources for Docker Desktop
-3. **Volume Permissions**: Enabled `volumePermissions.enabled=true` for Docker Desktop compatibility
-4. **Authentication**: Plaintext for local development (production template uses SASL_SSL)
-5. **Zookeeper**: Traditional Kafka + ZooKeeper (KRaft disabled for simplicity)
-6. **Automation**: Complete deployment, testing, and cleanup scripts
+1. **KRaft Mode**: Modern Kafka architecture without ZooKeeper dependency
+2. **Bitnami Secure Images**: Using free development tier with :latest tag
+3. **Single Configuration**: One values.yaml file for simplicity and maintainability
+4. **Local Development Focus**: Single replica, reduced resources for Docker Desktop
+5. **Volume Permissions**: Enabled for Docker Desktop compatibility
+6. **Authentication**: Plaintext for local development simplicity
+7. **Automation**: Complete deployment, testing, and cleanup scripts
 
 ### Connection Details
 - **Internal Service**: `kafka.kafka.svc.cluster.local:9092`
@@ -90,13 +88,12 @@ project_lego/
 - **Client Config**: kafka/config/client.properties
 
 ## Configuration Strategy
-This project uses an **override-only** approach:
-- Only specify values we want to change from defaults
-- Maintain ~60-100 lines instead of 2,400+ default lines
-- Easy updates and maintenance
-- Clear separation of customizations
-
-See [kafka/docs/configuration-strategy.md](kafka/docs/configuration-strategy.md) for detailed configuration approach.
+This project uses a **single configuration file** approach:
+- One `values.yaml` file with clear, documented overrides
+- KRaft mode enabled by default (modern Kafka architecture)
+- Bitnami Secure Images :latest tag (auto-updating for development)
+- Easy to understand and modify
+- Optimized for local Docker Desktop environment
 
 ## Getting Started
 
@@ -119,7 +116,7 @@ Automated verification including:
 - Producer and consumer functionality
 
 ### 3. Use Kafka
-Connect to: `kafka.kafka.svc.cluster.local:9092`
+Connect to: `kafka-local.kafka.svc.cluster.local:9092`
 
 Client configuration is pre-configured in `kafka/config/client.properties`
 
@@ -149,21 +146,22 @@ See [kafka/QUICKSTART.md](kafka/QUICKSTART.md) for detailed step-by-step instruc
 ## Technical Notes
 
 ### For Developers
-- **All configuration files are ready** - no additional setup needed before deployment
+- **Single configuration file** - `kafka/values/values.yaml` contains all settings
+- **KRaft mode** - Modern Kafka without ZooKeeper complexity
+- **Bitnami Secure Images** - Using :latest tag (development tier, auto-updating)
 - **Scripts are executable** - chmod +x already applied
-- **Override-only approach** - maintain this pattern for any new configurations
 - **Docker Desktop specific** - configurations optimized for local Docker Desktop environment
 
-### Configuration Files
-- **local-dev-values.yaml**: Primary configuration optimized for local development
-- **minimal-kafka-values.yaml**: Absolute minimal overrides for reference
-- **kafka-values.yaml**: Original comprehensive configuration
-- **production-values.yaml**: Template for production deployments
+### Important: About :latest Tag
+The configuration uses `bitnami/kafka:latest` which:
+- ✅ Always gets the newest stable Kafka version
+- ✅ No dependency on legacy repositories
+- ⚠️ Version may change automatically (intended for development only)
+- ⚠️ Not recommended for production use
 
 ### Troubleshooting
 For detailed troubleshooting and configuration guidance, refer to:
-- [kafka/QUICKSTART.md](kafka/QUICKSTART.md) - User guidance
-- [kafka/docs/configuration-strategy.md](kafka/docs/configuration-strategy.md) - Technical details
+- [kafka/QUICKSTART.md](kafka/QUICKSTART.md) - User guidance and step-by-step instructions
 
 ---
 
